@@ -1,4 +1,5 @@
 import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 
 DATA_URL = (
@@ -120,7 +121,42 @@ result = included[["평균기온", "유효_날짜_수"]].rename(
 )
 result["연평균 기온(°C)"] = result["연평균 기온(°C)"].round(2)
 
-st.line_chart(result["연평균 기온(°C)"])
+# 가장 더운 5개 해와 가장 추운 5개 해
+temp_col = "연평균 기온(°C)"
+hot5 = result[temp_col].nlargest(5).index
+cold5 = result[temp_col].nsmallest(5).index
+rest = result.index.difference(hot5.union(cold5))
+
+
+def make_trace(idx, name, color, label=False):
+    sub = result.loc[idx].sort_index()
+    return go.Scatter(
+        x=sub.index,
+        y=sub[temp_col],
+        mode="markers+text" if label else "markers",
+        name=name,
+        text=[str(y) for y in sub.index] if label else None,
+        textposition="top center",
+        marker=dict(color=color, size=11 if label else 7),
+        customdata=sub[["유효 날짜 수"]].values,
+        hovertemplate=(
+            "연도 %{x}<br>평균 기온 %{y:.2f}°C"
+            "<br>계산에 사용한 날짜 수 %{customdata[0]}일<extra></extra>"
+        ),
+    )
+
+
+fig = go.Figure()
+fig.add_trace(make_trace(rest, "일반 연도", "#9aa0a6"))
+fig.add_trace(make_trace(cold5, "가장 추운 5개 해", "#1f77b4", label=True))
+fig.add_trace(make_trace(hot5, "가장 더운 5개 해", "#d62728", label=True))
+fig.update_layout(
+    xaxis_title="연도",
+    yaxis_title="연평균 기온(°C)",
+    hovermode="closest",
+    height=550,
+)
+st.plotly_chart(fig, width="stretch")
 st.dataframe(result, width="stretch")
 
 st.download_button(
